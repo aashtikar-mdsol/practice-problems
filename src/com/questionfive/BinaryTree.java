@@ -35,7 +35,7 @@ public class BinaryTree {
         };
     }
 
-    public void findMax(Node current) throws InterruptedException, ExecutionException {
+    private void findMax(Node current) throws InterruptedException, ExecutionException {
         try {
             maxLock.lock();
             if (current.getData() > max) {
@@ -70,7 +70,7 @@ public class BinaryTree {
         return max;
     }
 
-    public Integer calculateDepth(Node current) throws ExecutionException, InterruptedException {
+    private Integer calculateDepth(Node current) throws ExecutionException, InterruptedException {
         if (current.getLeft() == null && current.getRight() == null) {
             return 0;
         }
