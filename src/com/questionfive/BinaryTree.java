@@ -1,9 +1,9 @@
 package com.questionfive;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.ArrayList;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class BinaryTree {
 
@@ -11,32 +11,63 @@ public class BinaryTree {
 
     private ExecutorService es = Executors.newCachedThreadPool();
 
-    private void add(Node current, Integer c) {
-        if (c < current.getData() && current.getLeft() == null) {
-            current.setLeft(new Node(c, null, null));
-        } else if (c < current.getData()) {
-            add(current.getLeft(), c);
-        } else if (c > current.getData() && current.getRight() == null) {
-            current.setRight(new Node(c, null, null));
-        } else {
-            add(current.getRight(), c);
-        }
+    private Lock maxLock = new ReentrantLock();
+
+    private Integer max = Integer.MIN_VALUE;
+
+    public void construct() {
+        root = new Node(5,
+                new Node(3,
+                        new Node(10, null, null),
+                        new Node(11, null, null)
+                ),
+                new Node(2, null, null)
+        );
     }
 
-    public void addNode(Integer c) {
-        if (root == null) {
-            root = new Node(c, null, null);
+    private Runnable constructRunnable(Node current) {
+        return () -> {
+            try {
+                findMax(current);
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+        };
+    }
+
+    public void findMax(Node current) throws InterruptedException, ExecutionException {
+        try {
+            maxLock.lock();
+            if (current.getData() > max) {
+                max = current.getData();
+            }
+        } finally {
+            maxLock.unlock();
+        }
+        if (current.getLeft() == null && current.getRight() == null) {
             return;
         }
-        add(root, c);
+        var futures = new ArrayList<Future>();
+        if (current.getRight() != null) {
+            futures.add(es.submit(constructRunnable(current.getRight())));
+        }
+        if (current.getLeft() != null) {
+            futures.add(es.submit(constructRunnable(current.getLeft())));
+        }
+        for (Future future : futures) {
+            future.get();
+        }
     }
 
     public Integer getMax() {
-        var current = root;
-        while (current.getRight() != null) {
-            current = current.getRight();
+
+        try {
+            var future = es.submit(constructRunnable(root));
+            future.get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
         }
-        return current.getData();
+        return max;
     }
 
     public Integer calculateDepth(Node current) throws ExecutionException, InterruptedException {
@@ -67,7 +98,7 @@ public class BinaryTree {
         return calculateDepth(current);
     }
 
-    public void close(){
+    public void close() {
         es.shutdownNow();
     }
 }
